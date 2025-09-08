@@ -1,0 +1,13 @@
+#!/bin/bash
+
+file=$1
+name=$(echo $1 | cut -f1 -d '.')
+should_del_files=1
+
+nasm -f elf64 -g -F dwarf -o $name.o $file
+gcc -no-pie -o $name $name.o 
+./$name
+
+if [[ should_del_files -eq 1 ]]; then
+	rm $name $name.o
+fi
