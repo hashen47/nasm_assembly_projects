@@ -1,0 +1,11 @@
+#!/bin/bash
+
+should_del_files=0
+
+nasm -f elf64 -g -F dwarf -o todo.o todo.asm 
+gcc -no-pie -o todo todo.o 
+./todo
+
+if [[ should_del_files -eq 1 ]]; then
+	rm todo todo.o 
+fi
