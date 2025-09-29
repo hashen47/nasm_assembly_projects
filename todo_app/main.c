@@ -32,5 +32,8 @@ int main(void)
 	PRINT_FLAG(O_CREAT);
 	printf("error: %s\n", strerror(9));
 
+	unsigned long long n1 = 23ULL;
+	printf("sizeof a pointer: %zu", sizeof &n1);
+
 	return 0;
 }

@@ -19,9 +19,6 @@ section .data
 	temp_todo_id_buffer               TIMES temp_todo_id_buffer_len db 0
 	temp_todo_status_buffer           db 0, 0 
 	temp_todo_content_buffer          TIMES todo_content_max_length db 0
-	temp_todo_id_buffer_read_len      dq 0 
-	temp_todo_status_buffer_read_len  dq 0 
-	temp_todo_content_buffer_read_len dq 0 
 	settings_file_fd                  dq 8
 	settings_file_content_len         equ 10
 	settings_file_content             TIMES settings_file_content_len db 0
@@ -33,10 +30,14 @@ section .data
 	todo_count_ascii                  times todo_count_ascii_len db 0
 	user_selected_option              db 0
 	user_selected_option_len          equ 1 
+	todo_id_ascii                     TIMES 10 db 0 
+	todo_id_ascii_len                 equ $-todo_id_ascii
+	todo_status_ascii                 TIMES 10 db 0 
+	todo_status_ascii_len             equ $-todo_status_ascii
 
 	newline_msg                       db 10, 0
 	newline_msg_len                   equ $-newline_msg
-	menu_msg                          db 10, "### TODO APP ###", 10, 10, "OPTIONS >", 10, "1. list tasks", 10, "2. add tasks", 10, "3. update task", 10, "4. delete task", 10, "5. exit", 10, 10, 0
+	menu_msg                          db 10, "-------------------------------", 10, "### TODO APP ###", 10, "-------------------------------", 10, 10, "OPTIONS >", 10, "1. list tasks", 10, "2. add tasks", 10, "3. update task", 10, "4. delete task", 10, "5. exit", 10, 10, 0
 	menu_msg_len                      equ $-menu_msg
 	prompt_msg                        db "> ", 0
 	prompt_msg_len                    equ $-prompt_msg
@@ -44,6 +45,14 @@ section .data
 	bye_msg_len                       equ $-bye_msg 
 	invalid_main_option_msg           db "Invalid option...", 10
 	invalid_main_option_msg_len       equ $-invalid_main_option_msg
+	todo_list_welcome_msg             db "-------------------------------", 10, "### TODO LIST ###", 10
+	todo_list_welcome_msg_len         db $-todo_list_welcome_msg 
+	todo_list_id_msg                  db "-------------------------------", 10, "id: ", 0
+	todo_list_id_msg_len              equ $-todo_list_id_msg 
+	todo_list_content_msg             db "content: ", 0
+	todo_list_content_msg_len         equ $-todo_list_content_msg 
+	todo_list_status_msg              db "status: ", 0
+	todo_list_status_msg_len          equ $-todo_list_status_msg
 
 	invalid_todo_count_fmt          db "invalid last id: %s", 0
 	debug_print_todo_count          db "current todo id: %ld", 10, 0
@@ -102,7 +111,135 @@ success_exit:
 	syscall
 
 
+proc_list_todos:
+	push rbp
+	mov rbp, rsp
+	sub rsp, 0x20
+	mov qword [rbp-0x8] , todo_ids
+	mov qword [rbp-0x10], todo_contents
+	mov qword [rbp-0x18], todo_statuses 
+	mov qword [rbp-0x20], 0 
+
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, todo_list_welcome_msg
+	mov rdx, todo_list_welcome_msg_len
+	syscall
+
+proc_list_todos_loop:
+	mov rcx, [rbp-0x20]
+	cmp rcx, [todo_count]
+	jge proc_list_todos_exit
+
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, todo_list_id_msg
+	mov rdx, todo_list_id_msg_len
+	syscall
+
+	mov rbx, qword [rbp-0x8]
+	mov rdi, [rbx]
+	mov rsi, todo_id_ascii
+	mov rdx, todo_id_ascii_len
+	call proc_itoa
+
+	mov rdi, todo_id_ascii
+	mov rsi, todo_id_ascii_len
+	call proc_get_ascii_length
+
+	mov rdx, rax
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, todo_id_ascii 
+	syscall
+
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, newline_msg
+	mov rdx, newline_msg_len
+	syscall
+
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, todo_list_content_msg
+	mov rdx, todo_list_content_msg_len
+	syscall
+
+	mov rbx, qword [rbp-0x8]
+	add rbx, 8
+	mov qword [rbp-0x8], rbx
+
+	mov rbx, [rbp-0x10]
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, rbx
+	mov rdx, todo_content_max_length
+	syscall
+
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, newline_msg
+	mov rdx, newline_msg_len
+	syscall
+
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, todo_list_status_msg
+	mov rdx, todo_list_status_msg_len
+	syscall
+
+	add rbx, todo_content_max_length
+	mov qword [rbp-0x10], rbx
+
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, todo_list_status_msg
+	mov rdi, todo_list_status_msg_len
+	syscall
+
+	mov rbx, qword [rbp-0x18]
+	mov rdi, [rbx]
+	mov rsi, todo_status_ascii 
+	mov rdx, todo_status_ascii_len
+	call proc_itoa
+
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, todo_status_ascii 
+	mov rdx, 1
+	syscall
+
+	mov rbx, qword [rbp-0x18]
+	add rbx, 8
+	mov qword [rbp-0x18], rbx
+
+	mov rax, 1
+	mov rdi, 1
+	mov rsi, newline_msg
+	mov rdx, newline_msg_len
+	syscall
+
+	mov rcx, qword [rbp-0x20]
+	inc rcx
+	mov qword [rbp-0x20], rcx 
+
+	jmp proc_list_todos_loop
+
+proc_list_todos_exit:
+	mov rsp, rbp
+	pop rbp
+	ret
+
+
 proc_load_todos:
+	push rbp
+	mov rbp, rsp
+	sub rsp, 0x20 
+	mov qword [rbp-0x8], todo_ids 
+	mov qword [rbp-0x10], todo_contents 
+	mov qword [rbp-0x18], todo_statuses 
+	mov qword [rbp-0x20], 0 
+
 	; open the file
 	mov rax, 2
 	mov rdi, storage_filename 
@@ -126,8 +263,9 @@ proc_load_todos:
 	mov rcx, [storage_file_read_content_len]
 
 proc_load_todos_main_loop:
-	cmp rcx, 0
-	jle proc_load_todos_exit
+	mov rcx, qword [rbp-0x20]
+	cmp rcx, [todo_count]
+	jge proc_load_todos_exit
 	push rsi
 
 	; reset buffers
@@ -161,7 +299,6 @@ proc_load_todos_read_id_loop:
 proc_load_todos_read_content:
 	inc rsi
 	mov rbx, temp_todo_content_buffer
-	mov qword [temp_todo_id_buffer_read_len], 1
 proc_load_todos_read_content_loop:
 	dec rcx
 	mov dl, byte [rsi]
@@ -190,42 +327,54 @@ proc_load_todos_read_status_loop:
 proc_load_todos_before_loop:
 	inc rsi
 	push rsi
-	push rcx
 
 	mov rdi, temp_todo_id_buffer
 	mov rsi, temp_todo_id_buffer_len
-	call proc_print_msg
+	call proc_atoi
 
-	mov rdi, newline_msg
-	mov rsi, newline_msg_len
-	call proc_print_msg
-
-	mov rdi, temp_todo_content_buffer
-	mov rsi, todo_content_max_length
-	call proc_print_msg
-
-	mov rdi, newline_msg
-	mov rsi, newline_msg_len
-	call proc_print_msg
+	mov rdi, qword [rbp-0x8] ; todo_ids 
+	mov qword [rdi], rax
+	add rdi, 8               ; size of the qword pointer
+	mov qword [rbp-0x8], rdi
 
 	mov rdi, temp_todo_status_buffer
 	mov rsi, 1
-	call proc_print_msg
+	call proc_atoi
 
-	mov rdi, newline_msg
-	mov rsi, newline_msg_len
-	call proc_print_msg
+	mov rdi, qword [rbp-0x18] ; todo_statuses
+	mov qword [rdi], rax
+	add rdi, 8
+	mov qword [rbp-0x18], rdi
 
-	; TODO: array saving should do here 
-	pop rcx
+	mov rdi, qword [rbp-0x10] ; todo_contents
+	mov rsi, temp_todo_content_buffer
+	mov rcx, todo_content_max_length
+
+.proc_load_todos_fill_todo_contents_loop:
+	mov dl, byte [rsi]
+	mov byte [rdi], dl
+	inc rdi
+	inc rsi
+	loop .proc_load_todos_fill_todo_contents_loop
+	
+	mov qword [rbp-0x10], rdi
+
 	pop rsi
+
+	mov rcx, qword [rbp-0x20]
+	inc rcx
+	mov qword [rbp-0x20], rcx
+
 	jmp proc_load_todos_main_loop
 
 proc_load_todos_exit:
 	; close the file
 	mov rax, 3
-	mov rdi, storage_file_fd
+	mov rdi, [storage_file_fd]
 	syscall
+
+	mov rsp, rbp
+	pop rbp
 	ret
 
 
@@ -255,6 +404,7 @@ proc_load_main_option:
 	mov dl, [user_selected_option]
 	cmp dl, "1"
 	jne proc_load_main_option_two
+	call proc_list_todos
 proc_load_main_option_one:
 	; option one
 	jmp proc_load_main_option_exit
@@ -283,6 +433,25 @@ proc_load_main_option_fail:
 	mov rsi, invalid_main_option_msg_len
 	call proc_print_msg
 proc_load_main_option_exit:
+	ret
+
+
+proc_get_ascii_length:
+	; rdi - buffer
+	; rsi - max buffer length
+	xor rax, rax
+	mov rcx, rsi
+	mov rsi, rdi 
+
+.proc_get_ascii_length_loop:
+	mov dl, byte [rsi]
+	cmp dl, 0
+	je proc_get_ascii_length_exit
+	inc rax
+	inc rsi
+	loop .proc_get_ascii_length_loop
+
+proc_get_ascii_length_exit:
 	ret
 
 
